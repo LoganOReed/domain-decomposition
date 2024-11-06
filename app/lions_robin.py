@@ -142,7 +142,7 @@ def lions_robin_domain_decomposition(f, L, interface_point, N1, N2, eta=1.0, alp
 
         # Show the combined plot
         plt.tight_layout()
-        plt.savefig(f'output/{filename}.png')
+        plt.savefig(f'output/lions/{filename}.png')
         plt.close()
 
     return x1, x2, u1, u2, errors
@@ -267,10 +267,10 @@ def different_interface_points_and_robin_alphas(f,interface_points,alpha_robins,
 if __name__ == "__main__":
     # Length of the domain
     L = 1.0                
-    # different_interface_points(f,[0.23,0.5,0.83], [100,100,1000], [1000,1000,100],filenames = ['nonoverlap_left', 'nonoverlap_center', 'nonoverlap_right'], visual=True)
+    different_interface_points(f,[0.23,0.5,0.83], [100,100,1000], [1000,1000,100],filenames = ['nonoverlap_left', 'nonoverlap_center', 'nonoverlap_right'], visual=True)
     # different_interface_points(f,[0.23,0.5,0.83], [100,100,1000], [1000,1000,100],filenames = ['nonoverlap_left', 'nonoverlap_center', 'nonoverlap_right'], visual=False)
-    # different_robin_alphas(f,0.83,[0.1,0.5,0.9], 1000, 100, filenames = ['nonoverlap_center_small_alpha', 'nonoverlap_center_medium_alpha', 'nonoverlap_center_large_alpha'], visual=True)
-    different_interface_points_and_robin_alphas(f,[0.3,0.5,0.7,0.9],[0.4,1.0,4.0], [100,100,1000,1000], [1000,1000,100,100], tol=1e-23, filenames = ['one', 'two', 'three', 'four'], visual=True)
+    different_robin_alphas(f,0.83,[0.1,0.5,0.9], 1000, 100, filenames = ['nonoverlap_center_small_alpha', 'nonoverlap_center_medium_alpha', 'nonoverlap_center_large_alpha'], visual=False)
+    different_interface_points_and_robin_alphas(f,[0.3,0.5,0.7,0.9],[0.4,1.0,4.0], [100,100,1000,1000], [1000,1000,100,100], tol=1e-23, filenames = ['nonoverlap_left_large_alpha', 'nonoverlap_center_large_alpha', 'nonoverlap_right_large_alpha', 'nonoverlap_far_right_large_alpha'], visual=True)
 
     # u1, u2, errors = lions_robin_domain_decomposition(g, L, 0.2, 100, 160, alpha_robin=0.4, filename='nonlipschitz')
     # u1, u2, errors = lions_robin_domain_decomposition(f, L, 0.23, N1, N2, alpha_robin=0.6, filename='nonoverlap_left')

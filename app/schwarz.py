@@ -1,7 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def schwarz_domain_decomposition(f, L, N, overlap, overlap_center, max_iter=100, tol=1e-8, filename='test', visual=True):
+def f(x):
+    return np.where(x <= 0.5, np.sin(10*np.pi * x), -1*np.sin(100*np.pi * x))
+
+def u_explicit(x):
+    """explicit computation of solution"""
+    return np.where(x <= 0.5, np.divide(np.sin(10*np.pi * x),10*10*np.pi*np.pi), np.divide(-1*np.sin(100*np.pi * x),100*100*np.pi*np.pi))
+ 
+
+def schwarz_domain_decomposition(f, L, N, overlap, overlap_center, max_iter=4000, tol=1e-15, filename='test', visual=True):
     """
     Runs the Schwarz domain decomposition method with overlapping subdomains.
 
@@ -17,7 +25,7 @@ def schwarz_domain_decomposition(f, L, N, overlap, overlap_center, max_iter=100,
     - visual: bool, true if the visuals should be created
 
     Returns:
-    - errors, x1, u1, x2, u2
+    - errors, x1, x2, u1, u2
     """
 
     # Domain setup
@@ -93,10 +101,10 @@ def schwarz_domain_decomposition(f, L, N, overlap, overlap_center, max_iter=100,
         ax2.grid(True)
 
         plt.tight_layout()
-        plt.savefig(f'output/{filename}.png')
+        plt.savefig(f'output/schwarz/{filename}.png')
         plt.close()
 
-    return errors, x1, u1, x2, u2
+    return errors, x1, x2, u1, u2
 
 
 def different_overlap_locations(f,N,overlap_size,overlap_centers,filenames, visual=False):
@@ -152,15 +160,14 @@ def different_overlap_sizes(f,N,overlap_sizes,overlap_center,filenames,visual=Fa
     plt.close()
 
 if __name__ == "__main__":
-    f=lambda x: np.where(x <= 0.5, np.sin(10 * np.pi * x), -1*np.sin(100 * np.pi * x))
     different_overlap_locations(f,
                                 N = 5000,
-                                overlap_size = 100,
+                                overlap_size = 200,
                                 overlap_centers = [0.3,0.5,0.7],
-                                filenames = ['schwarz_left', 'schwarz_center', 'schwarz_right'],
+                                filenames = ['left', 'center', 'right'],
                                 visual = True)
     different_overlap_sizes(f,
                                 N = 5000,
                                 overlap_sizes = [100,500,1000],
                                 overlap_center = 0.5,
-                                filenames = ['schwarz_small', 'schwarz_medium', 'schwarz_large'])
+                                filenames = ['small', 'medium', 'large'])
