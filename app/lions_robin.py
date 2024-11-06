@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 def f(x):
     return np.where(x <= 0.5, np.sin(10*np.pi * x), -1*np.sin(100*np.pi * x))
 
+def f_boundary_layer(x, eps_inverse=100):
+    return np.exp(-eps_inverse * x) * np.sin(eps_inverse * np.pi * x)
+
 def g(x):
     return np.sin((10*np.pi)/(x + 0.0001))
 
@@ -267,11 +270,13 @@ def different_interface_points_and_robin_alphas(f,interface_points,alpha_robins,
 if __name__ == "__main__":
     # Length of the domain
     L = 1.0                
-    different_interface_points(f,[0.23,0.5,0.83], [100,100,1000], [1000,1000,100],filenames = ['nonoverlap_left', 'nonoverlap_center', 'nonoverlap_right'], visual=True)
+    # different_interface_points(f,[0.23,0.5,0.83], [100,100,1000], [1000,1000,100],filenames = ['nonoverlap_left', 'nonoverlap_center', 'nonoverlap_right'], visual=True)
     # different_interface_points(f,[0.23,0.5,0.83], [100,100,1000], [1000,1000,100],filenames = ['nonoverlap_left', 'nonoverlap_center', 'nonoverlap_right'], visual=False)
-    different_robin_alphas(f,0.83,[0.1,0.5,0.9], 1000, 100, filenames = ['nonoverlap_center_small_alpha', 'nonoverlap_center_medium_alpha', 'nonoverlap_center_large_alpha'], visual=False)
-    different_interface_points_and_robin_alphas(f,[0.3,0.5,0.7,0.9],[0.4,1.0,4.0], [100,100,1000,1000], [1000,1000,100,100], tol=1e-23, filenames = ['nonoverlap_left_large_alpha', 'nonoverlap_center_large_alpha', 'nonoverlap_right_large_alpha', 'nonoverlap_far_right_large_alpha'], visual=True)
+    # different_robin_alphas(f,0.83,[0.1,0.5,0.9], 1000, 100, filenames = ['nonoverlap_center_small_alpha', 'nonoverlap_center_medium_alpha', 'nonoverlap_center_large_alpha'], visual=False)
+    # different_interface_points_and_robin_alphas(f,[0.3,0.5,0.7,0.9],[0.4,1.0,4.0], [100,100,1000,1000], [1000,1000,100,100], tol=1e-23, filenames = ['nonoverlap_left_large_alpha', 'nonoverlap_center_large_alpha', 'nonoverlap_right_large_alpha', 'nonoverlap_far_right_large_alpha'], visual=True)
 
+
+    _,_,_,_, errors = lions_robin_domain_decomposition(f_boundary_layer, L, 0.05, 100, 100, alpha_robin=3.0, filename='boundary_layer', tol=1e-20)
     # u1, u2, errors = lions_robin_domain_decomposition(g, L, 0.2, 100, 160, alpha_robin=0.4, filename='nonlipschitz')
     # u1, u2, errors = lions_robin_domain_decomposition(f, L, 0.23, N1, N2, alpha_robin=0.6, filename='nonoverlap_left')
     # u1, u2, errors = lions_robin_domain_decomposition(f, L, 0.83, 1000, 100, alpha_robin=0.6, filename='nonoverlap_right')
