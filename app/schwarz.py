@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 def f(x):
     return np.where(x <= 0.5, np.sin(10*np.pi * x), -1*np.sin(100*np.pi * x))
 
+def f_boundary_layer(x, eps_inverse=100):
+    return np.exp(-eps_inverse * x) * np.sin(eps_inverse * np.pi * x)
+
+def f_interior_layer(x, x0=0.5, width=0.05):
+    return np.exp(-((x - x0) / width)**2) * np.sin(100 * np.pi * x)
+
+
 def u_explicit(x):
     """explicit computation of solution"""
     return np.where(x <= 0.5, np.divide(np.sin(10*np.pi * x),10*10*np.pi*np.pi), np.divide(-1*np.sin(100*np.pi * x),100*100*np.pi*np.pi))
@@ -94,6 +101,7 @@ def schwarz_domain_decomposition(f, L, N, overlap, overlap_center, max_iter=4000
         # Plot the final solution on the second subplot
         ax2.plot(x1, u1, label='Subdomain 1')
         ax2.plot(x2, u2, label='Subdomain 2')
+        ax2.plot(x1[-overlap:], 0.5*u1[-overlap:] + 0.5*u2[:overlap], label='Overlap')
         ax2.set_xlabel('x')
         ax2.set_ylabel('u(x)')
         ax2.set_title('Solution on Overlapping Subdomains')
@@ -160,6 +168,9 @@ def different_overlap_sizes(f,N,overlap_sizes,overlap_center,filenames,visual=Fa
     plt.close()
 
 if __name__ == "__main__":
+
+    schwarz_domain_decomposition(f_boundary_layer,L=1.0, N=5000, overlap=100, overlap_center=0.15, max_iter=1000, tol=1e-15, filename='boundary_layer')
+    schwarz_domain_decomposition(f_interior_layer,L=1.0, N=5000, overlap=1500, overlap_center=0.5, max_iter=1000, tol=1e-15, filename='interior_layer')
     different_overlap_locations(f,
                                 N = 5000,
                                 overlap_size = 200,

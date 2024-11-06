@@ -1,11 +1,23 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from functools import partial
 
 def f(x):
     return np.where(x <= 0.5, np.sin(10*np.pi * x), -1*np.sin(100*np.pi * x))
 
 def f_boundary_layer(x, eps_inverse=100):
     return np.exp(-eps_inverse * x) * np.sin(eps_inverse * np.pi * x)
+
+
+def f_interior_layer(x, x0=[0.3, 0.7], width=0.025, period=1):
+    return sum(np.exp(-((x - xi) / width)**2) * np.sin(period * np.pi * x) for xi in x0)
+
+# def f_not_square_summable(x, eps_inverse=100):
+#     return np.sin((10*np.pi) / x+ 0.0000000000001) / np.sqrt(x + 0.0000000000001)
+
+def f_not_square_summable(x, eps_inverse=100):
+    return 1 / np.sqrt(x + 0.00000000000001)
+
 
 def g(x):
     return np.sin((10*np.pi)/(x + 0.0001))
@@ -267,6 +279,128 @@ def different_interface_points_and_robin_alphas(f,interface_points,alpha_robins,
     plt.savefig(f'output/compare/nonoverlap_robin_alphas_and_interface_points.png')
     plt.close()
 
+
+def multi_subdomain_decomposition(f, L, interface_points, Ns, eta=1.0, alpha_robin=1.0, tol=1e-15, max_iter=1000, filename='test'):
+    """
+    Solves the 1D Poisson equation using P.-L. Lions' domain decomposition method with Robin transmission conditions
+    across multiple subdomains.
+
+    Parameters:
+    - f: function
+        The source term as a vectorized Python function.
+    - L: float
+        Length of the domain.
+    - Ns: list of int
+        Number of grid points for each subdomain.
+    - interface_points: list of float
+        Positions of the interfaces between subdomains.
+    - eta: float, optional
+        Parameter for the differential equation (default is 1.0).
+    - alpha_robin: float, optional
+        Coefficient for the Robin boundary condition (default is 0.3).
+    - tol: float, optional
+        Tolerance for convergence (default is 1e-8).
+    - max_iter: int, optional
+        Maximum number of iterations (default is 1000).
+
+    Returns:
+    - solutions: list of numpy arrays
+        The approximate solutions in each subdomain.
+    - errors: list
+        List of errors at each iteration.
+    """
+
+    # Generate subdomain grids
+    subdomains = []
+    h_values = []
+    all_x = [0] + interface_points + [L]
+    
+    for i in range(len(all_x) - 1):
+        x_sub = np.linspace(all_x[i], all_x[i+1], int(Ns[i] + 1))
+        subdomains.append(x_sub)
+        h_values.append(x_sub[1] - x_sub[0])
+
+    # Initial guesses for solutions and lambdas at each interface
+    solutions = [np.zeros_like(x) for x in subdomains]
+    lambdas = [0.0] * (len(interface_points) * 2)
+
+    # Helper function to solve a subdomain problem with Robin boundary condition
+    def solve_subdomain(f_values, x_sub, h, lambda_value, alpha_robin):
+        u_new = np.zeros_like(x_sub)
+        N_sub = len(x_sub) - 1
+
+        # Solve the interior points of the subdomain
+        for i in range(1, N_sub):
+            u_new[i] = (u_new[i - 1] + u_new[i + 1] - h**2 * f_values[i]) / (2 + h**2 * eta)
+
+        # Apply Robin boundary condition at the right interface
+        u_new[-1] = (lambda_value + alpha_robin * u_new[-2]) / (alpha_robin + 1 / h)
+
+        return u_new
+
+    # Main iterative solver for the multi-subdomain decomposition
+    errors = []
+    for iter in range(max_iter):
+        old_solutions = [u.copy() for u in solutions]
+        # Iterate over each subdomain
+        for i in range(len(subdomains)):
+            f_values = f(subdomains[i])
+            # Handle boundary conditions for each subdomain
+            if i == 0:
+                # Left-most subdomain only interacts with the right
+                lambda_val = lambdas[2 * i + 1]
+                solutions[i] = solve_subdomain(f_values, subdomains[i], h_values[i], lambda_val, alpha_robin)
+                # Update lambda for right interface
+                lambdas[2 * i + 1] = -lambdas[2 * i + 2] + 2 * alpha_robin * solutions[i][-1]
+            elif i == len(subdomains) - 1:
+                # Right-most subdomain only interacts with the left
+                lambda_val = lambdas[2 * (i - 1)]
+                solutions[i] = solve_subdomain(f_values, subdomains[i], h_values[i], lambda_val, alpha_robin)
+                # Update lambda for left interface
+                lambdas[2 * (i - 1)] = -lambdas[2 * (i - 1) + 1] + 2 * alpha_robin * solutions[i][0]
+            else:
+                # Middle subdomains interact with both left and right
+                lambda_left = lambdas[2 * (i - 1)]
+                solutions[i] = solve_subdomain(f_values, subdomains[i], h_values[i], lambda_left, alpha_robin)
+                # Update lambdas for both interfaces
+                lambdas[2 * (i - 1)] = -lambdas[2 * (i - 1) + 1] + 2 * alpha_robin * solutions[i][0]
+                lambdas[2 * i + 1] = -lambdas[2 * i] + 2 * alpha_robin * solutions[i][-1]
+
+        # Compute the error
+        error = sum(np.linalg.norm(u - u_old) for u, u_old in zip(solutions, old_solutions))
+        errors.append(error)
+        if error < tol:
+            break
+
+    # Plot the combined results
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Plot the convergence rate
+    ax1.plot(errors,label=f'alpha = {alpha_robin}')
+    ax1.set_yscale('log')
+    ax1.set_xlabel('Iteration')
+    ax1.set_ylabel('Error (L2 norm)')
+    ax1.set_title("Convergence of P.-L. Lions' Domain Decomposition Method")
+    ax1.legend()
+    ax1.grid(True)
+
+
+
+    # Plot the final solution
+    for i, (x_sub, u_sub) in enumerate(zip(subdomains, solutions)):
+        ax2.plot(x_sub, u_sub, label=f'Subdomain {i+1}')
+    ax2.set_xlabel('x')
+    ax2.set_ylabel('u(x)')
+    ax2.set_title("Solution of the PDE using Multi-Subdomain Domain Decomposition")
+    ax2.legend()
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(f'output/lions/{filename}.png')
+    plt.close()
+
+    return solutions, errors
+
 if __name__ == "__main__":
     # Length of the domain
     L = 1.0                
@@ -276,7 +410,28 @@ if __name__ == "__main__":
     # different_interface_points_and_robin_alphas(f,[0.3,0.5,0.7,0.9],[0.4,1.0,4.0], [100,100,1000,1000], [1000,1000,100,100], tol=1e-23, filenames = ['nonoverlap_left_large_alpha', 'nonoverlap_center_large_alpha', 'nonoverlap_right_large_alpha', 'nonoverlap_far_right_large_alpha'], visual=True)
 
 
-    _,_,_,_, errors = lions_robin_domain_decomposition(f_boundary_layer, L, 0.05, 100, 100, alpha_robin=3.0, filename='boundary_layer', tol=1e-20)
+    # Shows boundary Layer
+    # _,_,_,_, errors = lions_robin_domain_decomposition(f_boundary_layer, L, 0.05, 100, 100, alpha_robin=3.0, filename='boundary_layer', tol=1e-20)
+
+    # TODO: Show figure with difference from actual solution, since smaller steps doesn't show anything when not convergent
+    # _,_,_,_, errors = lions_robin_domain_decomposition(f_not_square_summable, L, 0.15, 1000, 1000, alpha_robin=10.5, filename='not_square_summable', tol=1e-32)
+
+    # TODO: Put this and next (commented) setup into one plot to show difference in boundary choice
+    # Since the latter's bdy is too close to the inner layer it causes the outer two subdomains to oscillate
+    _, errors = multi_subdomain_decomposition(partial(f_interior_layer, x0=[0.5], period=100), L, [0.4,0.6], [100, 1000, 100], alpha_robin=1.0, filename='interior_layer_good_boundary', tol=1e-25)
+    _, errors = multi_subdomain_decomposition(partial(f_interior_layer, x0=[0.5], period = 100), L, [0.45,0.55], [100, 1000, 100], alpha_robin=1.0, filename='interior_layer_bad_boundary', tol=1e-20)
+
+
+
+    # _, errors = multi_subdomain_decomposition(f_interior_layer, L, [0.15, 0.42, 0.58, 0.85], [100, 100, 100, 100, 100], alpha_robin=2.0, filename='multiple_interior_layer', tol=1e-20)
+
+    # multiple interior layers with oscillations
+    # _, errors = multi_subdomain_decomposition(partial(f_interior_layer_multiple, period=1000), L, [0.15, 0.5, 0.85], [100, 1000, 1000, 100], alpha_robin=2.0, filename='multiple_interior_layer', tol=1e-20)
+    # multiple interior layers with NO oscillations
+    # _, errors = multi_subdomain_decomposition(f_interior_layer_multiple, L, [0.15, 0.5, 0.85], [100, 1000, 1000, 100], alpha_robin=2.0, filename='multiple_interior_layer', tol=1e-20)
+
+    # Shows Interior Layer
+    # _,_,_,_, errors = lions_robin_domain_decomposition(f_interior_layer, L, 0.45, 400, 600, alpha_robin=1.0, filename='interior_layer', tol=1e-20)
     # u1, u2, errors = lions_robin_domain_decomposition(g, L, 0.2, 100, 160, alpha_robin=0.4, filename='nonlipschitz')
     # u1, u2, errors = lions_robin_domain_decomposition(f, L, 0.23, N1, N2, alpha_robin=0.6, filename='nonoverlap_left')
     # u1, u2, errors = lions_robin_domain_decomposition(f, L, 0.83, 1000, 100, alpha_robin=0.6, filename='nonoverlap_right')
