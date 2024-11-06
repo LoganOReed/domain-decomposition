@@ -16,3 +16,7 @@ c. interior layer
 ## (maybe) Find a function and DD setup which breaks
 Construct an f and DD setup which doesn't converge to a known solution, if possible.
 This is a "maybe" because that should be the goal for the previous problem
+
+## (maybe) Convergence Example in 2d
+Construct a convergence proof and convergence rate for the 2 subdomain case (-\ifty, a) x R and (0,\ifty) x R where a > 0.
+TODO: Give a few hints. The proof is fairly straightforward but there are a couple steps which would be unfair to expect them to do.
