@@ -92,7 +92,7 @@ def lions_robin_domain_decomposition(f, L, interface_point, N1, N2, eta=1.0, alp
         u1, u2 = u0_1.copy(), u0_2.copy()
         errors = []
         
-        lambda1, lambda2 = 0.0, 0.0  # Initial lambda values
+        lambda1, lambda2 = 1.0, 1.0  # Initial lambda values
         
         for iter in range(max_iter):
             u1_old, u2_old = u1.copy(), u2.copy()
@@ -325,52 +325,89 @@ def multi_subdomain_decomposition(f, L, interface_points, Ns, eta=1.0, alpha_rob
     lambdas = [0.0] * (len(interface_points) * 2)
 
     # Helper function to solve a subdomain problem with Robin boundary condition
-    def solve_subdomain(f_values, x_sub, h, lambda_value, alpha_robin):
-        u_new = np.zeros_like(x_sub)
-        N_sub = len(x_sub) - 1
 
-        # Solve the interior points of the subdomain
+    def solve_subdomain(f_values, x_sub, h, boundary_value, alpha_robin, eta=1.0):
+        """
+        Solves the Poisson equation in a single subdomain with Robin boundary coupling.
+
+        Parameters:
+        - f_values: array-like
+            The source term evaluated at the grid points of the subdomain.
+        - x_sub: array-like
+            The grid points for the current subdomain.
+        - h: float
+            Grid spacing for the current subdomain.
+        - boundary_value: float
+            Value from the neighboring subdomain used in the Robin boundary condition.
+        - alpha_robin: float
+            Coefficient for the Robin boundary condition.
+        - eta: float, optional
+            Coefficient for the differential equation.
+
+        Returns:
+        - u_new: array-like
+            Solution in the current subdomain after applying boundary conditions.
+        """
+        # Initialize the solution array
+        u_new = np.zeros_like(x_sub)
+        N_sub = len(x_sub) - 1  # Number of interior points
+
+        # Iteratively solve the Poisson equation for the interior points
         for i in range(1, N_sub):
             u_new[i] = (u_new[i - 1] + u_new[i + 1] - h**2 * f_values[i]) / (2 + h**2 * eta)
 
-        # Apply Robin boundary condition at the right interface
-        u_new[-1] = (lambda_value + alpha_robin * u_new[-2]) / (alpha_robin + 1 / h)
+        # Apply Robin boundary condition at the interface
+        u_new[-1] = (alpha_robin * boundary_value + u_new[-2]) / (alpha_robin + 1 / h)
 
         return u_new
 
-    # Main iterative solver for the multi-subdomain decomposition
-    errors = []
-    for iter in range(max_iter):
-        old_solutions = [u.copy() for u in solutions]
-        # Iterate over each subdomain
-        for i in range(len(subdomains)):
-            f_values = f(subdomains[i])
-            # Handle boundary conditions for each subdomain
-            if i == 0:
-                # Left-most subdomain only interacts with the right
-                lambda_val = lambdas[2 * i + 1]
-                solutions[i] = solve_subdomain(f_values, subdomains[i], h_values[i], lambda_val, alpha_robin)
-                # Update lambda for right interface
-                lambdas[2 * i + 1] = -lambdas[2 * i + 2] + 2 * alpha_robin * solutions[i][-1]
-            elif i == len(subdomains) - 1:
-                # Right-most subdomain only interacts with the left
-                lambda_val = lambdas[2 * (i - 1)]
-                solutions[i] = solve_subdomain(f_values, subdomains[i], h_values[i], lambda_val, alpha_robin)
-                # Update lambda for left interface
-                lambdas[2 * (i - 1)] = -lambdas[2 * (i - 1) + 1] + 2 * alpha_robin * solutions[i][0]
-            else:
-                # Middle subdomains interact with both left and right
-                lambda_left = lambdas[2 * (i - 1)]
-                solutions[i] = solve_subdomain(f_values, subdomains[i], h_values[i], lambda_left, alpha_robin)
-                # Update lambdas for both interfaces
-                lambdas[2 * (i - 1)] = -lambdas[2 * (i - 1) + 1] + 2 * alpha_robin * solutions[i][0]
-                lambdas[2 * i + 1] = -lambdas[2 * i] + 2 * alpha_robin * solutions[i][-1]
 
-        # Compute the error
+    # Main iterative solver for the multi-subdomain decomposition
+
+    errors = []
+    num_interfaces = len(interface_points)
+    for iteration in range(max_iter):
+        # Store a copy of the old solutions to track convergence
+        old_solutions = [u.copy() for u in solutions]
+
+        # Iterate over each subdomain
+        for i, (x_sub, h, solution) in enumerate(zip(subdomains, h_values, solutions)):
+            # Calculate the source term values for the current subdomain
+            f_values = f(x_sub)
+
+            # Apply boundary conditions based on neighboring subdomains
+            if i == 0:
+                # Left-most subdomain: Use the right boundary from the next subdomain
+                boundary_value = solutions[i + 1][1] if num_interfaces > 0 else 0.0
+                solutions[i] = solve_subdomain(f_values, x_sub, h, boundary_value, alpha_robin)
+
+            elif i == len(subdomains) - 1:
+                # Right-most subdomain: Use the left boundary from the previous subdomain
+                boundary_value = solutions[i - 1][-2] if num_interfaces > 0 else 0.0
+                solutions[i] = solve_subdomain(f_values, x_sub, h, boundary_value, alpha_robin)
+
+            else:
+                # Middle subdomains: Use both left and right boundaries from neighbors
+                boundary_left = solutions[i - 1][-2]
+                boundary_right = solutions[i + 1][1]
+                # First apply the left boundary condition
+                solutions[i] = solve_subdomain(f_values, x_sub, h, boundary_left, alpha_robin)
+                # Then apply the right boundary condition directly using `boundary_right`
+                solutions[i][-1] = (alpha_robin * boundary_right + solutions[i][-2]) / (alpha_robin + 1 / h)
+
+        # Compute the error based on the difference in solutions
         error = sum(np.linalg.norm(u - u_old) for u, u_old in zip(solutions, old_solutions))
         errors.append(error)
+
+        # Check for convergence
         if error < tol:
+            print(f"Converged after {iteration + 1} iterations with error = {error:.6e}")
             break
+
+# If max iterations reached without convergence
+        else:
+            print(f"Reached maximum iterations ({max_iter}) with final error = {error:.6e}")
+
 
     # Plot the combined results
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
@@ -418,8 +455,11 @@ if __name__ == "__main__":
 
     # TODO: Put this and next (commented) setup into one plot to show difference in boundary choice
     # Since the latter's bdy is too close to the inner layer it causes the outer two subdomains to oscillate
-    _, errors = multi_subdomain_decomposition(partial(f_interior_layer, x0=[0.5], period=100), L, [0.4,0.6], [100, 1000, 100], alpha_robin=1.0, filename='interior_layer_good_boundary', tol=1e-25)
-    _, errors = multi_subdomain_decomposition(partial(f_interior_layer, x0=[0.5], period = 100), L, [0.45,0.55], [100, 1000, 100], alpha_robin=1.0, filename='interior_layer_bad_boundary', tol=1e-20)
+    # _, errors = multi_subdomain_decomposition(partial(f_interior_layer, x0=[0.5], period=100), L, [0.4,0.6], [100, 1000, 100], alpha_robin=1.0, filename='interior_layer_good_boundary', tol=1e-25)
+    # _, errors = multi_subdomain_decomposition(partial(f_interior_layer, x0=[0.5], period = 100), L, [0.45,0.55], [100, 1000, 100], alpha_robin=1.0, filename='interior_layer_bad_boundary', tol=1e-20)
+
+
+    _, errors = lions_robin_domain_decomposition(f, L, 0.5, 500, 500, alpha_robin=1.0, filename='test', tol=1e-8)
 
 
 
