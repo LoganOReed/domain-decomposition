@@ -17,6 +17,24 @@ import matplotlib.pyplot as plt
 def f(x, x0=[0.2], width=0.1, period=100):
     return sum(np.exp(-((x - xi) / width)**2) * np.sin(period * np.pi * x) for xi in x0)
 
+def f_continuous(x):
+        # Sigmoid-like function to smooth the transition at x = 0.5
+        # Smooth transition function with a sharp change in oscillation at x = 0.5
+        smooth_transition = 1 / (1 + np.exp(-50 * (x - 0.5)))
+
+        # Low-frequency oscillation part (low-frequency sine wave)
+        low_oscillation = np.sin(2 * np.pi * x)
+
+        # High-frequency oscillation part (high-frequency sine wave)
+        high_oscillation = np.sin(2 * np.pi * 10 * x)
+
+        # Blend the two oscillations smoothly using the smooth transition
+        result = (1 - smooth_transition) * low_oscillation + smooth_transition * high_oscillation
+
+        return result
+
+
+
 
 def f_continuous(x):
     """Multiscale continuous function with a smooth transition at x = 0.5."""
