@@ -5,7 +5,7 @@ def f_actual(x):
     """docstring for f_actual"""
     return -1*(1 / (9*np.pi*np.pi))*np.sin(3*np.pi * x)
 
-def run_lions_domain_decomposition(f, L, alpha, N1, N2, eta=1.0, alpha_robin=1.0, tol=1e-16, max_iter=1000):
+def run_lions_domain_decomposition(f, L, alpha, N1, N2, eta=1.0, alpha_robin=1.0, tol=1e-16, max_iter=3000):
     """
     Runs the P.-L. Lions' domain decomposition method with Robin boundary conditions.
 
@@ -25,10 +25,10 @@ def run_lions_domain_decomposition(f, L, alpha, N1, N2, eta=1.0, alpha_robin=1.0
     """
 
     # Set up the subdomains with different grid spacings
-    x1 = np.linspace(0, alpha, N1 + 1)
-    x2 = np.linspace(alpha, L, N2 + 1)
-    h1 = x1[1] - x1[0]  # Grid spacing for the first subdomain
-    h2 = x2[1] - x2[0]  # Grid spacing for the second subdomain
+    x1,h1 = np.linspace(0, alpha, N1 + 1, retstep=True)
+    x2,h2 = np.linspace(alpha, L, N2 + 1, retstep=True)
+    # h1 = x1[1] - x1[0]  # Grid spacing for the first subdomain
+    # h2 = x2[1] - x2[0]  # Grid spacing for the second subdomain
 
     # Initial guess for lambda values on the interface
     lambda1 = 0.0
@@ -106,7 +106,7 @@ def run_lions_domain_decomposition(f, L, alpha, N1, N2, eta=1.0, alpha_robin=1.0
             lambda2_new = -lambda1 + 2 * alpha_robin * u1[-1]
             
             # Calculate error and check convergence
-            error = np.linalg.norm(np.concatenate((u1, u2)) - np.concatenate((u1_old, u2_old)), ord=2)
+            error = np.linalg.norm(np.concatenate((u1, u2)) - np.concatenate((f_actual(x1), f_actual(x2))), ord=2)
             errors.append(error)
             
             if error < tol:
@@ -134,7 +134,7 @@ def run_lions_domain_decomposition(f, L, alpha, N1, N2, eta=1.0, alpha_robin=1.0
     # Plot the final solution on the second subplot
     ax2.plot(x1, u1, label='Subdomain 1 Solution')
     ax2.plot(x2, u2, label='Subdomain 2 Solution')
-    ax2.plot(np.linspace(0,L,1000), f_actual(np.linspace(0,L,1000)))
+    ax2.plot(np.linspace(0,L,300), f_actual(np.linspace(0,L,300)))
     ax2.set_xlabel('x')
     ax2.set_ylabel('u(x)')
     ax2.set_title("Solution of the PDE using P.-L. Lions' Domain Decomposition")
@@ -149,9 +149,9 @@ def run_lions_domain_decomposition(f, L, alpha, N1, N2, eta=1.0, alpha_robin=1.0
 run_lions_domain_decomposition(
     f=lambda x: np.sin(3*np.pi * x),  # Source function
     L=1.0,                          # Length of the domain
-    alpha=0.4,                      # Shared boundary point
-    alpha_robin=3.3,
-    N1=100,                          # Grid resolution for the first subdomain
-    N2=30                          # Grid resolution for the second subdomain
+    alpha=0.2,                      # Shared boundary point
+    alpha_robin=0.25,
+    N1=20,                          # Grid resolution for the first subdomain
+    N2=80                          # Grid resolution for the second subdomain
 )
 
